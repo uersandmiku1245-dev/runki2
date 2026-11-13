@@ -1,0 +1,271 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rubik Pro Timer</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  color: white;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at 20% 20%, #263d75 0%, transparent 45%),
+    radial-gradient(ellipse at 80% 80%, #54266f 0%, transparent 45%),
+    linear-gradient(135deg, #080d1b, #111827, #090b18);
+}
+
+h1 {
+  padding-top: 25px;
+  font-size: 35px;
+  letter-spacing: 5px;
+  color: #60a5fa;
+  text-shadow: 0 0 20px #3b82f6;
+}
+
+.scramble {
+  max-width: 850px;
+  margin: 35px auto;
+  padding: 20px;
+  font-size: 25px;
+  line-height: 1.8;
+  color: #facc15;
+  background: #ffffff0b;
+  border: 1px solid #ffffff20;
+  border-radius: 18px;
+  backdrop-filter: blur(12px);
+}
+
+.timer {
+  font-size: clamp(75px, 16vw, 145px);
+  font-weight: bold;
+  margin: 70px 0 25px;
+  font-variant-numeric: tabular-nums;
+  color: white;
+  text-shadow: 0 0 30px #60a5fa66;
+  transition: color .15s, text-shadow .15s;
+}
+
+.timer.ready {
+  color: #22c55e;
+  text-shadow: 0 0 35px #22c55e;
+}
+
+.timer.holding {
+  color: #facc15;
+}
+
+.status {
+  color: #aaa;
+  font-size: 17px;
+  min-height: 25px;
+}
+
+button {
+  padding: 13px 25px;
+  margin: 8px;
+  border: 1px solid #ffffff25;
+  border-radius: 12px;
+  color: white;
+  background: #ffffff15;
+  font-size: 16px;
+  cursor: pointer;
+  transition: .2s;
+}
+
+button:hover {
+  background: #3b82f6;
+  transform: translateY(-2px);
+}
+
+.panel {
+  max-width: 550px;
+  margin: 35px auto;
+  padding: 20px;
+  background: #ffffff0c;
+  border: 1px solid #ffffff20;
+  border-radius: 18px;
+}
+
+#history {
+  list-style: none;
+  padding: 0;
+}
+
+#history li {
+  padding: 13px;
+  margin: 8px 0;
+  background: #ffffff12;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.hint { color: #777; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>RUBIK TIMER</h1>
+
+<div class="scramble" id="scramble"></div>
+
+<div class="timer" id="timer">0.00</div>
+
+<div class="status" id="status">
+Giữ SPACE để chuẩn bị
+</div>
+
+<p class="hint">Giữ 0.5 giây → Thả để bắt đầu → SPACE để dừng</p>
+
+<button onclick="newScramble()">Scramble mới</button>
+<button onclick="resetTimer()">Reset</button>
+
+<div class="panel">
+<h2>🏆 Lịch sử giải</h2>
+<ul id="history"></ul>
+</div>
+
+<script>
+let running = false;
+let holding = false;
+let ready = false;
+let startTime = 0;
+let elapsed = 0;
+let holdTimeout = null;
+let interval = null;
+
+const timer = document.getElementById("timer");
+const statusText = document.getElementById("status");
+
+const moves = [
+"R","R'","R2","L","L'","L2",
+"U","U'","U2","D","D'","D2",
+"F","F'","F2","B","B'","B2"
+];
+
+function newScramble() {
+  let result = [];
+  let last = "";
+
+  while (result.length < 20) {
+    let move = moves[Math.floor(Math.random()*moves.length)];
+    if (move[0] !== last) {
+      result.push(move);
+      last = move[0];
+    }
+  }
+
+  document.getElementById("scramble").textContent =
+    result.join(" ");
+}
+
+function formatTime(ms) {
+  return (ms / 1000).toFixed(2);
+}
+
+function updateTimer() {
+  elapsed = Date.now() - startTime;
+  timer.textContent = formatTime(elapsed);
+}
+
+function keyDown(e) {
+  if (e.code !== "Space" || e.repeat) return;
+  e.preventDefault();
+
+  if (running) {
+    stopTimer();
+    return;
+  }
+
+  if (holding) return;
+
+  holding = true;
+  ready = false;
+
+  timer.className = "timer holding";
+  statusText.textContent = "Đang giữ...";
+
+  holdTimeout = setTimeout(() => {
+    if (holding) {
+      ready = true;
+      timer.className = "timer ready";
+      statusText.textContent = "SẴN SÀNG! Thả SPACE để bắt đầu";
+    }
+  }, 500);
+}
+
+function keyUp(e) {
+  if (e.code !== "Space") return;
+  e.preventDefault();
+
+  if (!holding) return;
+
+  holding = false;
+  clearTimeout(holdTimeout);
+
+  if (ready && !running) {
+    startTimer();
+  } else {
+    ready = false;
+    timer.className = "timer";
+    statusText.textContent = "Giữ SPACE để chuẩn bị";
+  }
+}
+
+function startTimer() {
+  running = true;
+  ready = false;
+  elapsed = 0;
+  startTime = Date.now();
+
+  timer.className = "timer";
+  statusText.textContent = "Đang giải...";
+  interval = setInterval(updateTimer, 10);
+}
+
+function stopTimer() {
+  running = false;
+  clearInterval(interval);
+
+  elapsed = Date.now() - startTime;
+  timer.textContent = formatTime(elapsed);
+
+  statusText.textContent = "Đã hoàn thành!";
+
+  let li = document.createElement("li");
+  li.innerHTML = `<span>#${document.getElementById("history").children.length+1}</span>
+                  <strong>${formatTime(elapsed)} s</strong>`;
+
+  document.getElementById("history").prepend(li);
+
+  newScramble();
+}
+
+function resetTimer() {
+  running = false;
+  holding = false;
+  ready = false;
+
+  clearInterval(interval);
+  clearTimeout(holdTimeout);
+
+  elapsed = 0;
+  timer.textContent = "0.00";
+  timer.className = "timer";
+  statusText.textContent = "Giữ SPACE để chuẩn bị";
+}
+
+document.addEventListener("keydown", keyDown);
+document.addEventListener("keyup", keyUp);
+
+newScramble();
+</script>
+
+</body>
+</html>
